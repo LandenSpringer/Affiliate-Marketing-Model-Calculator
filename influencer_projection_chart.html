@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Influencer Hybrid Model Projection</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a18; padding: 2rem; min-height: 100vh; }
+    .card { background: #fff; border-radius: 16px; border: 0.5px solid rgba(0,0,0,0.1); padding: 2rem; max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #73726c; margin-bottom: 1.5rem; }
+    .control-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.5rem; align-items: flex-end; }
+    .control-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+    .control-label { font-size: 12px; color: #73726c; }
+    input[type=range] { width: 100%; accent-color: #3266ad; }
+    .metric-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.5rem; }
+    @media (max-width: 600px) { .metric-row { grid-template-columns: repeat(2, 1fr); } }
+    .metric { background: #f5f4f0; border-radius: 8px; padding: 12px 14px; }
+    .metric-label { font-size: 12px; color: #73726c; margin-bottom: 4px; }
+    .metric-value { font-size: 20px; font-weight: 500; color: #1a1a18; }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #73726c; }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .section-label { font-size: 12px; color: #73726c; margin: 1.5rem 0 8px; }
+    .divider { border: none; border-top: 0.5px solid rgba(0,0,0,0.1); margin: 1.5rem 0; }
+    .note { font-size: 12px; color: #888780; margin-top: 1.5rem; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Influencer Hybrid Model Projection</h1>
+  <p class="subtitle">12-month forecast · flat fee + commission model · beach/lifestyle footwear</p>
+
+  <div class="control-row">
+    <div class="control-group">
+      <span class="control-label">Influencers recruited</span>
+      <input type="range" min="5" max="50" value="15" step="1" id="numInf" oninput="update()">
+      <span style="font-size:12px;color:#73726c" id="numInfOut">15 influencers</span>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Flat fee per influencer ($/mo)</span>
+      <input type="range" min="100" max="500" value="200" step="25" id="flatFee" oninput="update()">
+      <span style="font-size:12px;color:#73726c" id="flatFeeOut">$200/mo</span>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Shoe price ($)</span>
+      <input type="range" min="40" max="100" value="65" step="5" id="shoePrice" oninput="update()">
+      <span style="font-size:12px;color:#73726c" id="shoePriceOut">$65/pair</span>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Commission rate (%)</span>
+      <input type="range" min="5" max="20" value="10" step="1" id="commRate" oninput="update()">
+      <span style="font-size:12px;color:#73726c" id="commRateOut">10%</span>
+    </div>
+  </div>
+
+  <div class="metric-row" id="metrics"></div>
+
+  <div class="legend">
+    <span><span class="legend-dot" style="background:#3266ad"></span>Total monthly spend ($)</span>
+    <span><span class="legend-dot" style="background:#73726c"></span>Flat fee cost ($)</span>
+    <span><span class="legend-dot" style="background:#BA7517"></span>Commission cost ($)</span>
+    <span><span class="legend-dot" style="background:#1D9E75"></span>Est. shoes sold</span>
+  </div>
+
+  <div style="position:relative;width:100%;height:320px;">
+    <canvas id="mainChart"></canvas>
+  </div>
+
+  <hr class="divider">
+
+  <p class="section-label">Cost per shoe sold over time — hybrid vs. commission-only</p>
+  <div style="position:relative;width:100%;height:200px;">
+    <canvas id="cpsChart"></canvas>
+  </div>
+
+  <p class="note">
+    <strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
+    Flat fee range benchmark: $100–$750/post for 5k–15k follower creators. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.
+  </p>
+</div>
+
+<script>
+const months = ['Mo 1','Mo 2','Mo 3','Mo 4','Mo 5','Mo 6','Mo 7','Mo 8','Mo 9','Mo 10','Mo 11','Mo 12'];
+
+function projectedSales(inf, mo) {
+  return Math.round(inf * 3.5 * Math.pow(1.15, mo));
+}
+
+let mainChart, cpsChart;
+
+function buildData() {
+  const inf = +document.getElementById('numInf').value;
+  const flat = +document.getElementById('flatFee').value;
+  const price = +document.getElementById('shoePrice').value;
+  const rate = +document.getElementById('commRate').value / 100;
+
+  document.getElementById('numInfOut').textContent = inf + ' influencers';
+  document.getElementById('flatFeeOut').textContent = '$' + flat + '/mo';
+  document.getElementById('shoePriceOut').textContent = '$' + price + '/pair';
+  document.getElementById('commRateOut').textContent = (rate * 100).toFixed(0) + '%';
+
+  const totalFlat = inf * flat;
+  const commPerShoe = price * rate;
+  const salesData = months.map((_, i) => projectedSales(inf, i));
+  const commData = salesData.map(s => Math.round(s * commPerShoe));
+  const flatData = months.map(() => totalFlat);
+  const totalData = salesData.map((s, i) => Math.round(totalFlat + s * commPerShoe));
+
+  const mo12Sales = salesData[11];
+  const mo12Total = totalData[11];
+  const mo12CPS = mo12Total / mo12Sales;
+  const annualSpend = totalData.reduce((a, b) => a + b, 0);
+
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric"><div class="metric-label">Month 12 shoes sold</div><div class="metric-value">${mo12Sales.toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Month 12 spend</div><div class="metric-value">$${mo12Total.toLocaleString()}</div></div>
+    <div class="metric"><div class="metric-label">Cost per shoe (mo 12)</div><div class="metric-value">$${mo12CPS.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Annual total spend</div><div class="metric-value">$${annualSpend.toLocaleString()}</div></div>
+  `;
+
+  const hybridCPS = totalData.map((t, i) => +(t / salesData[i]).toFixed(2));
+  const commOnlyCPS = salesData.map((s, i) => +((s * commPerShoe) / s).toFixed(2));
+
+  return { salesData, commData, flatData, totalData, hybridCPS, commOnlyCPS };
+}
+
+function update() {
+  const d = buildData();
+  if (mainChart) {
+    mainChart.data.datasets[0].data = d.totalData;
+    mainChart.data.datasets[1].data = d.flatData;
+    mainChart.data.datasets[2].data = d.commData;
+    mainChart.data.datasets[3].data = d.salesData;
+    mainChart.update();
+  }
+  if (cpsChart) {
+    cpsChart.data.datasets[0].data = d.hybridCPS;
+    cpsChart.data.datasets[1].data = d.commOnlyCPS;
+    cpsChart.update();
+  }
+}
+
+const d = buildData();
+
+mainChart = new Chart(document.getElementById('mainChart'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Total monthly spend ($)', data: d.totalData, backgroundColor: '#3266ad', borderRadius: 3, yAxisID: 'y' },
+      { label: 'Flat fee ($)', data: d.flatData, backgroundColor: '#73726c', borderRadius: 3, yAxisID: 'y' },
+      { label: 'Commission cost ($)', data: d.commData, backgroundColor: '#BA7517', borderRadius: 3, yAxisID: 'y' },
+      { type: 'line', label: 'Shoes sold', data: d.salesData, borderColor: '#1D9E75', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#1D9E75', tension: 0.3, yAxisID: 'y2' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+    scales: {
+      x: { stacked: false, grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { font: { size: 11 }, callback: v => '$' + v.toLocaleString() } },
+      y2: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { font: { size: 11 }, callback: v => v + ' pairs' } }
+    }
+  }
+});
+
+cpsChart = new Chart(document.getElementById('cpsChart'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Hybrid (flat + commission)', data: d.hybridCPS, borderColor: '#3266ad', backgroundColor: 'rgba(50,102,173,0.08)', fill: true, borderWidth: 2, tension: 0.4, pointRadius: 2 },
+      { label: 'Commission only', data: d.commOnlyCPS, borderColor: '#BA7517', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [4,3], tension: 0.4, pointRadius: 2 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 11 }, padding: 12 } },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { font: { size: 11 }, callback: v => '$' + v.toFixed(2) } }
+    }
+  }
+});
+</script>
+</body>
+</html>
