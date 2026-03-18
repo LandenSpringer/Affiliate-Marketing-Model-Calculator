@@ -11,15 +11,27 @@
     .card { background: #fff; border-radius: 16px; border: 0.5px solid rgba(0,0,0,0.1); padding: 2rem; max-width: 900px; margin: 0 auto; }
     h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
     .subtitle { font-size: 13px; color: #73726c; margin-bottom: 1.5rem; }
+
+    .toggle-bar { display: flex; gap: 0; margin-bottom: 1.25rem; border: 0.5px solid rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; width: fit-content; }
+    .toggle-bar button { padding: 7px 18px; font-size: 13px; font-family: inherit; border: none; cursor: pointer; background: transparent; color: #73726c; transition: background 0.15s, color 0.15s; }
+    .toggle-bar button.active { background: #3266ad; color: #fff; }
+    .toggle-bar button:first-child { border-right: 0.5px solid rgba(0,0,0,0.1); }
+
     .control-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.5rem; align-items: flex-end; }
     .control-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
     .control-label { font-size: 12px; color: #73726c; }
     input[type=range] { width: 100%; accent-color: #3266ad; }
+
+    .posts-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.5rem; align-items: flex-end; padding: 14px 16px; background: #f5f4f0; border-radius: 10px; }
+    .posts-row .control-group { min-width: 120px; }
+    .posts-summary { font-size: 13px; color: #3266ad; font-weight: 500; padding: 14px 16px; background: #EEF3FA; border-radius: 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
+
     .metric-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.5rem; }
-    @media (max-width: 600px) { .metric-row { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .metric-row { grid-template-columns: repeat(2, 1fr); } .control-row { gap: 10px; } }
     .metric { background: #f5f4f0; border-radius: 8px; padding: 12px 14px; }
     .metric-label { font-size: 12px; color: #73726c; margin-bottom: 4px; }
     .metric-value { font-size: 20px; font-weight: 500; color: #1a1a18; }
+
     .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #73726c; }
     .legend span { display: flex; align-items: center; gap: 5px; }
     .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
@@ -33,6 +45,16 @@
   <h1>Influencer Hybrid Model Projection</h1>
   <p class="subtitle">12-month forecast · flat fee + commission model · beach/lifestyle footwear</p>
 
+  <!-- Flat fee mode toggle -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
+    <span style="font-size:12px;color:#73726c;">Flat fee mode:</span>
+    <div class="toggle-bar">
+      <button class="active" id="btn-monthly" onclick="setMode('monthly')">Per month</button>
+      <button id="btn-post" onclick="setMode('post')">Per post</button>
+    </div>
+  </div>
+
+  <!-- Shared sliders -->
   <div class="control-row">
     <div class="control-group">
       <span class="control-label">Influencers recruited</span>
@@ -40,7 +62,7 @@
       <span style="font-size:12px;color:#73726c" id="numInfOut">15 influencers</span>
     </div>
     <div class="control-group">
-      <span class="control-label">Flat fee per influencer ($/mo)</span>
+      <span class="control-label" id="flatFeeLabel">Flat fee per influencer ($/mo)</span>
       <input type="range" min="100" max="500" value="200" step="25" id="flatFee" oninput="update()">
       <span style="font-size:12px;color:#73726c" id="flatFeeOut">$200/mo</span>
     </div>
@@ -53,6 +75,20 @@
       <span class="control-label">Commission rate (%)</span>
       <input type="range" min="5" max="20" value="10" step="1" id="commRate" oninput="update()">
       <span style="font-size:12px;color:#73726c" id="commRateOut">10%</span>
+    </div>
+  </div>
+
+  <!-- Per-post extra controls (hidden in monthly mode) -->
+  <div id="post-controls" style="display:none;">
+    <div class="posts-row">
+      <div class="control-group">
+        <span class="control-label">Posts per influencer per month</span>
+        <input type="range" min="1" max="8" value="2" step="1" id="postsPerMonth" oninput="update()">
+        <span style="font-size:12px;color:#73726c" id="postsPerMonthOut">2 posts/mo</span>
+      </div>
+    </div>
+    <div class="posts-summary" id="postsSummary">
+      Effective flat fee: $400/influencer/mo · $6,000 total flat per month across 15 influencers
     </div>
   </div>
 
@@ -76,14 +112,33 @@
     <canvas id="cpsChart"></canvas>
   </div>
 
-  <p class="note">
-    <strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
-    Flat fee range benchmark: $100–$750/post for 5k–15k follower creators. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.
+  <p class="note" id="footerNote">
+    <strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds.
+    Flat fee benchmark: $100–$750/post for 5k–15k follower creators. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.
   </p>
 </div>
 
 <script>
 const months = ['Mo 1','Mo 2','Mo 3','Mo 4','Mo 5','Mo 6','Mo 7','Mo 8','Mo 9','Mo 10','Mo 11','Mo 12'];
+let mode = 'monthly';
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-monthly').classList.toggle('active', m === 'monthly');
+  document.getElementById('btn-post').classList.toggle('active', m === 'post');
+  document.getElementById('post-controls').style.display = m === 'post' ? 'block' : 'none';
+  const flatSlider = document.getElementById('flatFee');
+  const flatLabel = document.getElementById('flatFeeLabel');
+  if (m === 'post') {
+    flatSlider.min = 50; flatSlider.max = 400; flatSlider.step = 25;
+    if (+flatSlider.value > 400) flatSlider.value = 200;
+    flatLabel.textContent = 'Flat fee per post ($/post)';
+  } else {
+    flatSlider.min = 100; flatSlider.max = 500; flatSlider.step = 25;
+    flatLabel.textContent = 'Flat fee per influencer ($/mo)';
+  }
+  update();
+}
 
 function projectedSales(inf, mo) {
   return Math.round(inf * 3.5 * Math.pow(1.15, mo));
@@ -93,21 +148,35 @@ let mainChart, cpsChart;
 
 function buildData() {
   const inf = +document.getElementById('numInf').value;
-  const flat = +document.getElementById('flatFee').value;
+  const feeInput = +document.getElementById('flatFee').value;
   const price = +document.getElementById('shoePrice').value;
   const rate = +document.getElementById('commRate').value / 100;
+  const postsPerMo = +document.getElementById('postsPerMonth').value;
 
   document.getElementById('numInfOut').textContent = inf + ' influencers';
-  document.getElementById('flatFeeOut').textContent = '$' + flat + '/mo';
   document.getElementById('shoePriceOut').textContent = '$' + price + '/pair';
   document.getElementById('commRateOut').textContent = (rate * 100).toFixed(0) + '%';
+  document.getElementById('postsPerMonthOut').textContent = postsPerMo + ' posts/mo';
 
-  const totalFlat = inf * flat;
+  let totalFlat, flatLabel;
+  if (mode === 'monthly') {
+    totalFlat = inf * feeInput;
+    flatLabel = '$' + feeInput + '/mo';
+    document.getElementById('flatFeeOut').textContent = flatLabel;
+  } else {
+    const effectivePerInf = feeInput * postsPerMo;
+    totalFlat = inf * effectivePerInf;
+    flatLabel = '$' + feeInput + '/post';
+    document.getElementById('flatFeeOut').textContent = flatLabel;
+    document.getElementById('postsSummary').textContent =
+      `Effective flat fee: $${effectivePerInf.toLocaleString()}/influencer/mo · $${totalFlat.toLocaleString()} total flat per month across ${inf} influencers`;
+  }
+
   const commPerShoe = price * rate;
   const salesData = months.map((_, i) => projectedSales(inf, i));
   const commData = salesData.map(s => Math.round(s * commPerShoe));
   const flatData = months.map(() => totalFlat);
-  const totalData = salesData.map((s, i) => Math.round(totalFlat + s * commPerShoe));
+  const totalData = salesData.map((s) => Math.round(totalFlat + s * commPerShoe));
 
   const mo12Sales = salesData[11];
   const mo12Total = totalData[11];
@@ -122,7 +191,18 @@ function buildData() {
   `;
 
   const hybridCPS = totalData.map((t, i) => +(t / salesData[i]).toFixed(2));
-  const commOnlyCPS = salesData.map((s, i) => +((s * commPerShoe) / s).toFixed(2));
+  const commOnlyCPS = salesData.map(() => +(price * rate).toFixed(2));
+
+  if (mode === 'post') {
+    document.getElementById('footerNote').innerHTML =
+      `<strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
+      Per-post flat fee: ${inf} influencers × ${postsPerMo} posts/mo × $${feeInput}/post = $${totalFlat.toLocaleString()}/mo flat commitment. 
+      Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.`;
+  } else {
+    document.getElementById('footerNote').innerHTML =
+      `<strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
+      Flat fee benchmark: $100–$750/post for 5k–15k follower creators. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.`;
+  }
 
   return { salesData, commData, flatData, totalData, hybridCPS, commOnlyCPS };
 }
