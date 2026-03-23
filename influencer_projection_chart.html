@@ -58,17 +58,20 @@
   <div class="control-row">
     <div class="control-group">
       <span class="control-label">Influencers recruited</span>
-      <input type="range" min="5" max="50" value="15" step="1" id="numInf" oninput="update()">
+      <!-- MIN changed from 5 → 1 -->
+      <input type="range" min="1" max="50" value="15" step="1" id="numInf" oninput="update()">
       <span style="font-size:12px;color:#73726c" id="numInfOut">15 influencers</span>
     </div>
     <div class="control-group">
       <span class="control-label" id="flatFeeLabel">Flat fee per influencer ($/mo)</span>
-      <input type="range" min="100" max="500" value="200" step="25" id="flatFee" oninput="update()">
+      <!-- Monthly range widened: min $25, max $2,000 -->
+      <input type="range" min="25" max="2000" value="200" step="25" id="flatFee" oninput="update()">
       <span style="font-size:12px;color:#73726c" id="flatFeeOut">$200/mo</span>
     </div>
     <div class="control-group">
       <span class="control-label">Shoe price ($)</span>
-      <input type="range" min="40" max="100" value="65" step="5" id="shoePrice" oninput="update()">
+      <!-- MIN changed from $40 → $8 -->
+      <input type="range" min="8" max="100" value="65" step="1" id="shoePrice" oninput="update()">
       <span style="font-size:12px;color:#73726c" id="shoePriceOut">$65/pair</span>
     </div>
     <div class="control-group">
@@ -130,11 +133,13 @@ function setMode(m) {
   const flatSlider = document.getElementById('flatFee');
   const flatLabel = document.getElementById('flatFeeLabel');
   if (m === 'post') {
-    flatSlider.min = 50; flatSlider.max = 400; flatSlider.step = 25;
-    if (+flatSlider.value > 400) flatSlider.value = 200;
+    // Per-post range: min $5, max $500
+    flatSlider.min = 5; flatSlider.max = 500; flatSlider.step = 5;
+    if (+flatSlider.value > 500) flatSlider.value = 100;
     flatLabel.textContent = 'Flat fee per post ($/post)';
   } else {
-    flatSlider.min = 100; flatSlider.max = 500; flatSlider.step = 25;
+    // Per-month range: min $25, max $2,000
+    flatSlider.min = 25; flatSlider.max = 2000; flatSlider.step = 25;
     flatLabel.textContent = 'Flat fee per influencer ($/mo)';
   }
   update();
@@ -153,7 +158,7 @@ function buildData() {
   const rate = +document.getElementById('commRate').value / 100;
   const postsPerMo = +document.getElementById('postsPerMonth').value;
 
-  document.getElementById('numInfOut').textContent = inf + ' influencers';
+  document.getElementById('numInfOut').textContent = inf + ' influencer' + (inf === 1 ? '' : 's');
   document.getElementById('shoePriceOut').textContent = '$' + price + '/pair';
   document.getElementById('commRateOut').textContent = (rate * 100).toFixed(0) + '%';
   document.getElementById('postsPerMonthOut').textContent = postsPerMo + ' posts/mo';
@@ -169,7 +174,7 @@ function buildData() {
     flatLabel = '$' + feeInput + '/post';
     document.getElementById('flatFeeOut').textContent = flatLabel;
     document.getElementById('postsSummary').textContent =
-      `Effective flat fee: $${effectivePerInf.toLocaleString()}/influencer/mo · $${totalFlat.toLocaleString()} total flat per month across ${inf} influencers`;
+      `Effective flat fee: $${effectivePerInf.toLocaleString()}/influencer/mo · $${totalFlat.toLocaleString()} total flat per month across ${inf} influencer${inf === 1 ? '' : 's'}`;
   }
 
   const commPerShoe = price * rate;
@@ -196,12 +201,12 @@ function buildData() {
   if (mode === 'post') {
     document.getElementById('footerNote').innerHTML =
       `<strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
-      Per-post flat fee: ${inf} influencers × ${postsPerMo} posts/mo × $${feeInput}/post = $${totalFlat.toLocaleString()}/mo flat commitment. 
+      Per-post flat fee: ${inf} influencer${inf === 1 ? '' : 's'} × ${postsPerMo} posts/mo × $${feeInput}/post = $${totalFlat.toLocaleString()}/mo flat commitment. 
       Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.`;
   } else {
     document.getElementById('footerNote').innerHTML =
       `<strong>Assumptions:</strong> Each influencer drives ~3.5 sales in month 1 with 15% month-over-month growth as content compounds. 
-      Flat fee benchmark: $100–$750/post for 5k–15k follower creators. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.`;
+      Flat fee benchmark: $25–$2,000/mo per influencer. Commission benchmark: Crocs 6%, TOMS 8%, typical DTC 10–15%.`;
   }
 
   return { salesData, commData, flatData, totalData, hybridCPS, commOnlyCPS };
